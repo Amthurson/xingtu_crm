@@ -75,14 +75,34 @@ else
 fi
 
 # 检查并安装Docker Compose
-if ! command -v docker-compose &> /dev/null; then
-    echo "正在安装Docker Compose..."
-    DOCKER_COMPOSE_VERSION="2.20.0"
-    curl -L "https://github.com/docker/compose/releases/download/v${DOCKER_COMPOSE_VERSION}/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
-    chmod +x /usr/local/bin/docker-compose
-    echo "✓ Docker Compose安装完成"
-else
+# 优先使用docker compose（新版本，已作为插件安装）
+if docker compose version &> /dev/null; then
+    echo "✓ Docker Compose已安装（插件版本）"
+    # 创建docker-compose别名（兼容旧命令）
+    if [ ! -f /usr/local/bin/docker-compose ]; then
+        cat > /usr/local/bin/docker-compose <<'EOF'
+#!/bin/bash
+docker compose "$@"
+EOF
+        chmod +x /usr/local/bin/docker-compose
+    fi
+elif command -v docker-compose &> /dev/null; then
     echo "✓ Docker Compose已安装"
+else
+    echo "正在安装Docker Compose..."
+    # 使用国内镜像源加速下载
+    DOCKER_COMPOSE_VERSION="2.20.0"
+    # 尝试使用国内镜像
+    if curl -L "https://ghproxy.com/https://github.com/docker/compose/releases/download/v${DOCKER_COMPOSE_VERSION}/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose 2>/dev/null; then
+        chmod +x /usr/local/bin/docker-compose
+        echo "✓ Docker Compose安装完成（使用国内镜像）"
+    elif curl -L "https://github.com/docker/compose/releases/download/v${DOCKER_COMPOSE_VERSION}/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose 2>/dev/null; then
+        chmod +x /usr/local/bin/docker-compose
+        echo "✓ Docker Compose安装完成"
+    else
+        echo "警告: Docker Compose下载失败，但Docker Compose插件可能已安装"
+        echo "尝试使用 'docker compose' 命令（新版本）"
+    fi
 fi
 
 # 配置Docker镜像加速器（使用阿里云）
