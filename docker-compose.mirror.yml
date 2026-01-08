@@ -1,0 +1,63 @@
+# 使用国内镜像源的docker-compose配置
+services:
+  postgres:
+    image: registry.cn-hangzhou.aliyuncs.com/acs/postgres:15-alpine
+    container_name: xingtu_crm_postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: xingtu_crm
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - xingtu_network
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      args:
+        - PYTHON_BASE_IMAGE=registry.cn-hangzhou.aliyuncs.com/google_containers/python:3.11-slim
+    container_name: xingtu_crm_backend
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/xingtu_crm
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - xingtu_network
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        - NODE_BASE_IMAGE=registry.cn-hangzhou.aliyuncs.com/google_containers/node:18-alpine
+        - NGINX_BASE_IMAGE=registry.cn-hangzhou.aliyuncs.com/google_containers/nginx:alpine
+    container_name: xingtu_crm_frontend
+    ports:
+      - "8080:80"
+    depends_on:
+      - backend
+    networks:
+      - xingtu_network
+
+volumes:
+  postgres_data:
+
+networks:
+  xingtu_network:
+    driver: bridge
+

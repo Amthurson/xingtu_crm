@@ -1,0 +1,27 @@
+from pydantic import BaseModel
+from typing import Optional, List
+from datetime import datetime
+
+
+class TagBase(BaseModel):
+    name: str
+    color: Optional[str] = None
+
+
+class TagCreate(TagBase):
+    pass
+
+
+class TagUpdate(BaseModel):
+    name: Optional[str] = None
+    color: Optional[str] = None
+
+
+class TagResponse(TagBase):
+    id: int
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+

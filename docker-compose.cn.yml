@@ -1,0 +1,62 @@
+# 使用国内镜像源的配置文件
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: xingtu_crm_postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: xingtu_crm
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - xingtu_network
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      args:
+        - PIP_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple
+    container_name: xingtu_crm_backend
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/xingtu_crm
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - xingtu_network
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        - NPM_REGISTRY=https://registry.npmmirror.com
+    container_name: xingtu_crm_frontend
+    ports:
+      - "8080:80"
+    depends_on:
+      - backend
+    networks:
+      - xingtu_network
+
+volumes:
+  postgres_data:
+
+networks:
+  xingtu_network:
+    driver: bridge
+
