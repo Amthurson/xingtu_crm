@@ -1,4 +1,6 @@
-# 使用国内镜像源的配置文件
+# 使用国内镜像源的docker-compose配置
+# 如果镜像加速器不工作，使用此配置
+
 services:
   postgres:
     image: postgres:15-alpine
@@ -22,9 +24,7 @@ services:
   backend:
     build:
       context: ./backend
-      dockerfile: Dockerfile
-      args:
-        - PIP_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple
+      pull: false
     container_name: xingtu_crm_backend
     environment:
       DATABASE_URL: postgresql://postgres:postgres@postgres:5432/xingtu_crm
@@ -42,9 +42,7 @@ services:
   frontend:
     build:
       context: ./frontend
-      dockerfile: Dockerfile
-      args:
-        - NPM_REGISTRY=https://registry.npmmirror.com
+      pull: false
     container_name: xingtu_crm_frontend
     ports:
       - "8080:80"
@@ -59,4 +57,3 @@ volumes:
 networks:
   xingtu_network:
     driver: bridge
-
