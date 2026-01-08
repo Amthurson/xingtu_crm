@@ -79,12 +79,13 @@ fi
 if docker compose version &> /dev/null; then
     echo "✓ Docker Compose已安装（插件版本）"
     # 创建docker-compose别名（兼容旧命令）
-    if [ ! -f /usr/local/bin/docker-compose ]; then
+    if [ ! -f /usr/local/bin/docker-compose ] || [ ! -x /usr/local/bin/docker-compose ]; then
         cat > /usr/local/bin/docker-compose <<'EOF'
 #!/bin/bash
 docker compose "$@"
 EOF
         chmod +x /usr/local/bin/docker-compose
+        echo "✓ 已创建docker-compose兼容命令"
     fi
 elif command -v docker-compose &> /dev/null; then
     echo "✓ Docker Compose已安装"
@@ -109,26 +110,52 @@ fi
 echo ""
 echo "配置Docker镜像加速器..."
 mkdir -p /etc/docker
+
+# 检查是否已有配置
+if [ -f /etc/docker/daemon.json ]; then
+    echo "检测到已有Docker配置，合并镜像加速器配置..."
+    # 备份原配置
+    cp /etc/docker/daemon.json /etc/docker/daemon.json.bak
+fi
+
+# 创建或更新配置
 cat > /etc/docker/daemon.json <<EOF
 {
   "registry-mirrors": [
     "https://docker.mirrors.ustc.edu.cn",
     "https://hub-mirror.c.163.com",
     "https://mirror.baidubce.com"
-  ]
+  ],
+  "max-concurrent-downloads": 10,
+  "max-concurrent-uploads": 5
 }
 EOF
+
+# 重启Docker使配置生效
+systemctl daemon-reload
 systemctl restart docker
+
+# 等待Docker完全启动
+sleep 3
+
+# 验证镜像加速器配置
+echo "验证镜像加速器配置..."
+docker info | grep -A 10 "Registry Mirrors" || echo "警告: 无法验证镜像加速器配置"
+
 echo "✓ 镜像加速器配置完成"
 
 # 拉取基础镜像
 echo ""
-echo "拉取基础镜像..."
-docker pull python:3.11-slim || true
-docker pull node:18-alpine || true
-docker pull postgres:15-alpine || true
-docker pull nginx:alpine || true
-echo "✓ 基础镜像拉取完成"
+echo "拉取基础镜像（使用镜像加速器）..."
+echo "如果拉取失败，将跳过并在构建时自动拉取..."
+
+# 设置超时时间，使用镜像加速器拉取
+timeout 60 docker pull python:3.11-slim 2>&1 | head -5 || echo "跳过python镜像（将在构建时拉取）"
+timeout 60 docker pull node:18-alpine 2>&1 | head -5 || echo "跳过node镜像（将在构建时拉取）"
+timeout 60 docker pull postgres:15-alpine 2>&1 | head -5 || echo "跳过postgres镜像（将在构建时拉取）"
+timeout 60 docker pull nginx:alpine 2>&1 | head -5 || echo "跳过nginx镜像（将在构建时拉取）"
+
+echo "✓ 基础镜像拉取完成（部分镜像可能需要在构建时拉取）"
 
 # 检查项目目录
 if [ ! -f "docker-compose.yml" ]; then
