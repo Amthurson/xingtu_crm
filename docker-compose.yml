@@ -2,6 +2,7 @@ services:
   postgres:
     image: postgres:15-alpine
     container_name: xingtu_crm_postgres
+    pull_policy: if_not_present
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
