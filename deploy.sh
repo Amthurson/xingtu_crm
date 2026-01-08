@@ -17,9 +17,58 @@ fi
 # 检查并安装Docker
 if ! command -v docker &> /dev/null; then
     echo "正在安装Docker..."
-    curl -fsSL https://get.docker.com | bash
-    systemctl start docker
-    systemctl enable docker
+    
+    # 检测系统类型
+    if [ -f /etc/os-release ]; then
+        . /etc/os-release
+        OS=$ID
+    else
+        OS=$(uname -s)
+    fi
+    
+    # 阿里云Linux使用CentOS方式安装
+    if [ "$OS" = "alinux" ] || [ "$OS" = "centos" ] || [ "$OS" = "rhel" ]; then
+        echo "检测到阿里云Linux/CentOS系统，使用yum安装Docker..."
+        # 安装依赖
+        yum install -y yum-utils device-mapper-persistent-data lvm2
+        
+        # 添加Docker仓库
+        yum-config-manager --add-repo https://mirrors.aliyun.com/docker-ce/linux/centos/docker-ce.repo
+        
+        # 安装Docker
+        yum install -y docker-ce docker-ce-cli containerd.io
+        
+        # 启动Docker
+        systemctl start docker
+        systemctl enable docker
+    elif [ "$OS" = "ubuntu" ] || [ "$OS" = "debian" ]; then
+        echo "检测到Ubuntu/Debian系统，使用apt安装Docker..."
+        # 更新包索引
+        apt-get update
+        
+        # 安装依赖
+        apt-get install -y apt-transport-https ca-certificates curl gnupg lsb-release
+        
+        # 添加Docker官方GPG密钥
+        curl -fsSL https://mirrors.aliyun.com/docker-ce/linux/ubuntu/gpg | gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
+        
+        # 添加Docker仓库
+        echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://mirrors.aliyun.com/docker-ce/linux/ubuntu $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
+        
+        # 安装Docker
+        apt-get update
+        apt-get install -y docker-ce docker-ce-cli containerd.io
+        
+        # 启动Docker
+        systemctl start docker
+        systemctl enable docker
+    else
+        echo "尝试使用通用安装脚本..."
+        curl -fsSL https://get.docker.com | bash
+        systemctl start docker
+        systemctl enable docker
+    fi
+    
     echo "✓ Docker安装完成"
 else
     echo "✓ Docker已安装"
